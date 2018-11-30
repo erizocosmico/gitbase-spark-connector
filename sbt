@@ -6,6 +6,8 @@
 
 set -o pipefail
 
+# yada yada
+
 declare -r sbt_release_version="0.13.17"
 declare -r sbt_unreleased_version="0.13.17"
 
