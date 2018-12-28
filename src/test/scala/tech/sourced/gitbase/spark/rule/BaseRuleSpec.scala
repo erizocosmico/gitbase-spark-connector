@@ -1,9 +1,9 @@
 package tech.sourced.gitbase.spark.rule
 
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.catalyst.expressions.{AttributeReference, ExprId, Expression, NamedExpression}
-import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
-import org.apache.spark.sql.catalyst.rules.Rule
+import org.apache.spark.sql.catalyst.expressions.{
+  AttributeReference, ExprId, Expression, NamedExpression
+}
 import org.apache.spark.sql.types.{DataType, MetadataBuilder, StructType}
 import org.scalatest.{BeforeAndAfterAll, FlatSpec, Matchers, Suite}
 import tech.sourced.gitbase.spark.{DefaultReader, Node, Sources}
