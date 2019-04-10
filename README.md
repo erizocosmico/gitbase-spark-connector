@@ -172,6 +172,13 @@ commitsDf.join(rcdf, Seq("repository_id", "commit_hash"))
   .selectExpr("commit_message", "commit_author_email")
   .show(truncate=false)
 ```
+## Regular expressions
+
+When a query is executed using `gitbase-spark-connector`, that query either fully or partially will be sent down for `gitbase` to execute.
+`gitbase` uses oniguruma as its regular expression engine, which is different to the one being used by Spark. So, regular expressions need to be written in a way that can be executed in both places, because depending on the query it can be executed in just one of the places or both.
+
+- [Oniguruma syntax](https://github.com/geoffgarside/oniguruma/blob/master/Syntax.txt)
+- [Java regular expression syntax](https://docs.oracle.com/javase/9/docs/api/java/util/regex/Pattern.html)
 
 ## License
 
