@@ -1,7 +1,8 @@
 package tech.sourced.gitbase.spark
 
 import java.util.Properties
-
+import java.nio.file.Paths
+import org.apache.commons.io.FileUtils
 
 class DefaultSourceSpec extends BaseGitbaseSpec {
 
@@ -360,6 +361,26 @@ class DefaultSourceSpec extends BaseGitbaseSpec {
       row(2).toString should not(be("ref_name"))
       row(3).isInstanceOf[Long] should be(true)
     })
+  }
+
+  it should "join with other data sources correctly" in {
+    val path = Paths.get(System.getProperty("java.io.tmpdir")).resolve("test-json-data")
+    try {
+      spark.sql("SELECT * FROM ref_commits WHERE ref_name REGEXP '/head'")
+        .write.json(path.toString)
+
+      val jsonDf = spark.read.json(path.toString)
+      val commitsDf = spark.table("commits")
+      val df = commitsDf.join(jsonDf, Seq("repository_id", "commit_hash"))
+        .selectExpr("commit_message", "commit_author_email")
+
+      val result = df.limit(2).collect().map(_ (1).toString)
+      result.length should be(2)
+      result(0) should be("lingerhk@gmail.com")
+      result(1) should be("lingerhk@gmail.com")
+    } finally {
+      FileUtils.deleteQuietly(path.toFile)
+    }
   }
 
 }

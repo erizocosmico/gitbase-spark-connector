@@ -22,35 +22,35 @@ object PushdownJoins extends Rule[LogicalPlan] {
       case q: logical.Join =>
         val jd = JoinOptimizer.getJoinData(q)
         if (!jd.valid) {
-          return q
-        }
-
-        jd match {
-          case JoinData(Some(source), _, filters, projectExprs, attributes, servers, _) =>
-            val node = DataSourceV2Relation(
-              attributes,
-              DefaultReader(
-                servers,
-                attributesToSchema(attributes),
-                source
-              )
-            )
-
-            val filteredNode = filters match {
-              case Some(filter) => logical.Filter(filter, node)
-              case None => node
-            }
-
-            // If the projection is empty, project the original schema.
-            if (projectExprs.nonEmpty) {
-              logical.Project(projectExprs, filteredNode)
-            } else {
-              logical.Project(
+          q
+        } else {
+          jd match {
+            case JoinData(Some(source), _, filters, projectExprs, attributes, servers, _) =>
+              val node = DataSourceV2Relation(
                 attributes,
-                filteredNode
+                DefaultReader(
+                  servers,
+                  attributesToSchema(attributes),
+                  source
+                )
               )
-            }
-          case _ => q
+
+              val filteredNode = filters match {
+                case Some(filter) => logical.Filter(filter, node)
+                case None => node
+              }
+
+              // If the projection is empty, project the original schema.
+              if (projectExprs.nonEmpty) {
+                logical.Project(projectExprs, filteredNode)
+              } else {
+                logical.Project(
+                  attributes,
+                  filteredNode
+                )
+              }
+            case _ => q
+          }
         }
 
       // Remove two consecutive projects and replace it with the outermost one.
