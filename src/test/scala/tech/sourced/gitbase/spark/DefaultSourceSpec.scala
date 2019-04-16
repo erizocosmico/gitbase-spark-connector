@@ -12,6 +12,14 @@ class DefaultSourceSpec extends BaseGitbaseSpec {
     spark.table("repositories").count() should equal(3)
   }
 
+  it should "have blob columns as binary" in {
+    spark.sql("describe table files")
+      .collect()
+      .find(r => r(0).toString == "blob_content")
+      .map(r => r(1).toString)
+      .getOrElse("") should be("binary")
+  }
+
   it should "perform joins and filters" in {
     val df = spark.sql(
       """
