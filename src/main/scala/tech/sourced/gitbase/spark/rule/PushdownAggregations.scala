@@ -2,13 +2,12 @@ package tech.sourced.gitbase.spark.rule
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.expressions.aggregate._
-import org.apache.spark.sql.catalyst.expressions.{
-  Alias, AttributeReference, Divide, Expression, NamedExpression}
+import org.apache.spark.sql.catalyst.expressions.{Alias,
+  AttributeReference, Divide, Expression, NamedExpression}
 import org.apache.spark.sql.catalyst.plans.logical
 import org.apache.spark.sql.catalyst.plans.logical.LogicalPlan
 import org.apache.spark.sql.catalyst.rules.Rule
 import org.apache.spark.sql.execution.datasources.v2.DataSourceV2Relation
-import org.apache.spark.sql.types.IntegerType
 import tech.sourced.gitbase.spark._
 
 object PushdownAggregations extends Rule[LogicalPlan] {
@@ -47,10 +46,6 @@ object PushdownAggregations extends Rule[LogicalPlan] {
       val pushedDownAggregate = transformedAggregate ++ missingAttrs
 
       val newOut = pushedDownAggregate.map {
-        // FIXME: hack to make it work with gitbase. Gitbase emits counts as INTEGER
-        // but spark wants longs.
-        case e@Alias(Count(_), _) =>
-          AttributeReference(e.name, IntegerType, e.nullable, e.metadata)(e.exprId, e.qualifier)
         case e =>
           AttributeReference(e.name, e.dataType, e.nullable, e.metadata)(e.exprId, e.qualifier)
       }
