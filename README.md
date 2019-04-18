@@ -96,6 +96,82 @@ Output:
 +-------------------------------------------------------------------------------+----------------------------------------+-------------------+
 ```
 
+## Usage with other data sources
+
+gitbase-spark-connector can be used not only with the provided data source but with all the ones that come with Spark or even custom data sources.
+UDFs defined in gitbase-spark-connector can also be used with those data sources.
+
+#### Parquet
+
+```scala
+val spark: SparkSession = SparkSession.builder().appName("test")
+    .master("local[*]")
+    .config("spark.driver.host", "localhost")
+    .registerGitbaseSource("127.0.0.1:3306")
+    .getOrCreate()
+
+// Store the 100 files inside a parquet file.
+spark.sql("SELECT * FROM files LIMIT 100")
+    .write.parquet("/path/to/store")
+
+// Apply language UDF to the stored parquet data.
+spark.read.parquet("/path/to/store")
+    .selectExpr(
+      "language(file_path, blob_content)",
+      "file_path"
+    )
+    .show()
+```
+
+#### JSON
+
+```scala
+val spark: SparkSession = SparkSession.builder().appName("test")
+  .master("local[*]")
+  .config("spark.driver.host", "localhost")
+  .registerGitbaseSource("127.0.0.1:3306")
+  .getOrCreate()
+
+// Store ref_commits table in a JSON file.
+spark.sql("SELECT * FROM ref_commits")
+  .write.json("/path/to/store")
+
+val jsonDf = spark.read.json("/path/to/store")
+val commitsDf = spark.table("commits")
+
+// Join the JSON dataframe with the one from gitbase.
+commitsDf.join(jsonDf, Seq("repository_id", "commit_hash"))
+  .where(jsonDf("ref_name") === "HEAD")
+  .selectExpr("commit_message", "commit_author_email")
+  .show(truncate=false)
+```
+
+#### JDBC
+
+```scala
+val spark: SparkSession = SparkSession.builder().appName("test")
+  .master("local[*]")
+  .config("spark.driver.host", "localhost")
+  .registerGitbaseSource("127.0.0.1:3306")
+  .getOrCreate()
+
+val commitsDf = spark.table("commits")
+
+val props = new Properties()
+props.put("user", "root")
+props.put("password", "")
+props.put("driver", "org.mariadb.jdbc.Driver")
+
+// Read ref_commits table using JDBC instead of gitbase-spark-connector.
+val rcdf = spark.read.jdbc("jdbc:mariadb://localhost:3306/gitbase", "ref_commits", props)
+    .drop("history_index")
+
+// Join both dataframes.
+commitsDf.join(rcdf, Seq("repository_id", "commit_hash"))
+  .where(rcdf("ref_name") === "HEAD")
+  .selectExpr("commit_message", "commit_author_email")
+  .show(truncate=false)
+```
 ## Regular expressions
 
 When a query is executed using `gitbase-spark-connector`, that query either fully or partially will be sent down for `gitbase` to execute.
