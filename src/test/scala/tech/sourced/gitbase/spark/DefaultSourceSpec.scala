@@ -12,6 +12,14 @@ class DefaultSourceSpec extends BaseGitbaseSpec {
     spark.table("repositories").count() should equal(3)
   }
 
+  it should "have blob columns as binary" in {
+    spark.sql("describe table files")
+      .collect()
+      .find(r => r(0).toString == "blob_content")
+      .map(r => r(1).toString)
+      .getOrElse("") should be("binary")
+  }
+
   it should "perform joins and filters" in {
     val df = spark.sql(
       """
@@ -334,6 +342,7 @@ class DefaultSourceSpec extends BaseGitbaseSpec {
       ("C", 1),
       ("C++", 1),
       ("CMake", 1),
+      ("Ignore List", 1),
       ("JSON", 1),
       ("JavaScript", 1),
       ("QML", 1),
@@ -373,11 +382,12 @@ class DefaultSourceSpec extends BaseGitbaseSpec {
       val commitsDf = spark.table("commits")
       val df = commitsDf.join(jsonDf, Seq("repository_id", "commit_hash"))
         .selectExpr("commit_message", "commit_author_email")
+        .orderBy("commit_author_email")
 
       val result = df.limit(2).collect().map(_ (1).toString)
       result.length should be(2)
-      result(0) should be("lingerhk@gmail.com")
-      result(1) should be("lingerhk@gmail.com")
+      result(0) should be("(no author)@ff5234a3-732a-0410-8ecb-13b9ad946718")
+      result(1) should be("(no author)@ff5234a3-732a-0410-8ecb-13b9ad946718")
     } finally {
       FileUtils.deleteQuietly(path.toFile)
     }
