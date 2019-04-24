@@ -8,7 +8,7 @@ class DefaultSourceSpec extends BaseGitbaseSpec {
 
   behavior of "DefaultSourceSpec"
 
-  it should "count repositories" in {
+  it should "count all repositories" in {
     spark.table("repositories").count() should equal(3)
   }
 
@@ -262,6 +262,198 @@ class DefaultSourceSpec extends BaseGitbaseSpec {
         |  num > 1
       """.stripMargin)
     df.show(20, truncate = false)
+  }
+
+  /***********************************/
+  /******* REFERENCE QUERIES *********/
+  /***********************************/
+
+  it should "count distinct repositories" in {
+    val result = spark.sql(
+      """SELECT COUNT(DISTINCT repository_id) AS repository_count
+      FROM repositories""").collect()
+    result.length should be(1)
+    result(0)(0) should be(3)
+  }
+
+  it should "select the last commit messages in HEAD for every repo" in {
+    val result = spark.sql(
+      """SELECT repository_id, commit_message
+                             FROM ref_commits
+                             NATURAL JOIN commits
+                             WHERE
+                                 ref_name LIKE 'refs/heads/HEAD/%' AND
+                                 history_index = 0
+                             ORDER BY repository_id""").collect()
+
+    result(0)(0) should be("05893125684f2d3943cd84a7ab2b75e53668fba1.siva")
+    result(0)(1) should be("Updating relationships.\n")
+
+    result(1)(0) should be("fff7062de8474d10a67d417ccea87ba6f58ca81d.siva")
+    result(1)(1) should be("Initial commit\n")
+
+    result(2)(0) should be("fff7062de8474d10a67d417ccea87ba6f58ca81d.siva")
+    result(2)(1) should be("Initial commit\n")
+
+    result(3)(0) should be("fff840f8784ef162dc83a1465fc5763d890b68ba.siva")
+    result(3)(1).toString.split("\n").head should
+      be("SVN_SILENT made messages (.desktop file) - always resolve ours")
+  }
+
+  it should "get all commit messages in HEAD history for each repository" in {
+    spark.sql(
+      """SELECT commit_message
+                FROM ref_commits
+                NATURAL JOIN commits
+                WHERE
+                    ref_name LIKE 'refs/heads/HEAD/%' AND
+                    history_index >= 0""").count() should be(1059)
+  }
+
+  it should "get the top 10 repositories by commit count on HEAD" in {
+    val result = spark.sql(
+      """SELECT
+                    r.repository_id,
+                    count(*) AS commit_count
+                FROM ref_commits r
+                NATURAL JOIN commits c
+                 WHERE
+                    r.ref_name LIKE 'refs/heads/HEAD/%'
+                GROUP BY r.repository_id, r.ref_name
+                ORDER BY commit_count DESC
+                LIMIT 10""").collect().map(r => (r(0), r(1)))
+
+    result should equal(Array(
+      ("05893125684f2d3943cd84a7ab2b75e53668fba1.siva", 606),
+      ("fff840f8784ef162dc83a1465fc5763d890b68ba.siva", 379),
+      ("fff840f8784ef162dc83a1465fc5763d890b68ba.siva", 72),
+      ("fff7062de8474d10a67d417ccea87ba6f58ca81d.siva", 1),
+      ("fff7062de8474d10a67d417ccea87ba6f58ca81d.siva", 1)
+    ))
+  }
+
+  it should "count repository HEADs" in {
+    spark.sql(
+      """SELECT
+                    repository_id,
+                    COUNT(repository_id) AS head_count
+                FROM refs
+                WHERE ref_name LIKE 'refs/heads/HEAD/%'
+                GROUP BY repository_id""").count() should be(3)
+  }
+
+  it should "get the top 50 tokens in files" in {
+    val result = spark.sql(
+      """SELECT
+                    token, COUNT(repository_id) AS repository_count
+                FROM (
+                    SELECT
+                        repository_id,
+                        EXPLODE(SPLIT(blob_content, '[^_A-Za-z0-9]+')) AS token
+                    FROM ref_commits
+                    NATURAL JOIN commit_blobs
+                    NATURAL JOIN blobs
+                    WHERE
+                        ref_name LIKE 'refs/heads/HEAD/%' AND
+                        NOT IS_BINARY(blob_content) AND
+                        LENGTH(blob_content) < 524288
+                ) AS q
+                GROUP BY token
+                ORDER BY repository_count DESC
+                LIMIT 50""")
+      .collect()
+      .map(row => (row(0).toString, row(1).asInstanceOf[Long]))
+
+    result.take(5) should equal(Array(
+      ("end", 1165439L),
+      ("should", 945547L),
+      ("the", 650752L),
+      ("do", 635618L),
+      ("a", 515144L)
+    ))
+  }
+
+  ignore should "get the top 50 identifiers in Ruby files by repository count" in {
+    // FIXME: https://github.com/src-d/gitbase-spark-connector/issues/65
+    spark.sql(
+      """SELECT
+                    identifier,
+                    COUNT(repository_id) AS repository_count
+                FROM (
+                    SELECT
+                        repository_id AS repository_id,
+                        EXPLODE(
+                          uast_extract_parse(
+                            uast_extract(
+                              uast(
+                                blob_content,
+                                language(file_path, blob_content),
+                                '//*[@roleIdentifier and not(@roleIncomplete)]'
+                              ),
+                              'token'
+                            )
+                          )
+                        ) AS identifier
+                    FROM ref_commits
+                    NATURAL JOIN commit_files
+                    NATURAL JOIN files
+                    WHERE
+                      ref_name LIKE 'refs/heads/HEAD/%' AND
+                      NOT IS_BINARY(blob_content) AND
+                      LENGTH(blob_content) < 25000 AND
+                      file_path REGEXP '\.(rb)$'
+                ) AS q
+                GROUP BY identifier
+                ORDER BY repository_count DESC
+                LIMIT 50""").show()
+  }
+
+  it should "get top 10 repositories by contributor count" in {
+    val result = spark.sql(
+      """SELECT
+                    repository_id,
+                    contributor_count
+                FROM (
+                    SELECT
+                        repository_id,
+                        COUNT(DISTINCT commit_author_email) AS contributor_count
+                    FROM commits
+                    GROUP BY repository_id
+                ) AS q
+                ORDER BY contributor_count DESC
+                LIMIT 10""")
+      .collect()
+      .map(row => (row(0).toString, row(1).asInstanceOf[Long]))
+
+    result should equal(Array(
+      ("fff840f8784ef162dc83a1465fc5763d890b68ba.siva", 12L),
+      ("05893125684f2d3943cd84a7ab2b75e53668fba1.siva", 8L),
+      ("fff7062de8474d10a67d417ccea87ba6f58ca81d.siva", 5L)
+    ))
+  }
+
+  it should "get projects created per year" in {
+    val result = spark.sql(
+      """SELECT
+                    year,
+                    COUNT(DISTINCT repository_id) AS project_count
+                FROM (
+                    SELECT
+                        repository_id,
+                        MIN(YEAR(commit_author_when)) AS year
+                    FROM ref_commits
+                    NATURAL JOIN commits
+                    WHERE
+                        ref_name LIKE 'refs/heads/HEAD/%'
+                    GROUP BY repository_id
+                ) AS q
+                GROUP BY year
+                ORDER BY year DESC""").collect().map(r => (r(0), r(1)))
+    result should equal(Array(
+      (2015, 1),
+      (2014, 1),
+      (2007, 1)
+    ))
   }
 
   it should "approximately detect forks" in {
