@@ -11,6 +11,7 @@ lazy val root = (project in file(".")).
     name := "gitbase-spark-connector",
 
     libraryDependencies += sparkSql % Provided,
+    libraryDependencies += sparkHiveThriftserver % Provided,
     libraryDependencies ++= Seq(
       scalaTest % Test,
       dockerJava % Test
