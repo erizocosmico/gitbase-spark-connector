@@ -21,7 +21,7 @@ services:
             - bblfshd
         links:
             - bblfshd
-        image: "srcd/gitbase:v0.20.0-beta3"
+        image: "srcd/gitbase:v0.20.0-beta4"
         ports:
             - "3306:3306"
         volumes:

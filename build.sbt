@@ -17,7 +17,7 @@ lazy val root = (project in file(".")).
       dockerJava % Test
     ),
     libraryDependencies ++= Seq(
-      mariaDB % Compile,
+      mysql % Compile,
       enry % Compile,
       bblfsh % Compile
     )

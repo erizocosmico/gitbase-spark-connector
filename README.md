@@ -6,7 +6,7 @@
 
 * [Scala](https://www.scala-lang.org/) 2.11.12
 * [Apache Spark 2.3.2 Installation](http://spark.apache.org/docs/2.3.2)
-* [gitbase](https://github.com/src-d/gitbase) >= v0.20.0-beta3
+* [gitbase](https://github.com/src-d/gitbase) >= v0.20.0-beta4
 * [bblfsh](https://github.com/bblfsh/bblfshd) >= 2.10.x
 
 ## Import as a dependency
@@ -160,10 +160,10 @@ val commitsDf = spark.table("commits")
 val props = new Properties()
 props.put("user", "root")
 props.put("password", "")
-props.put("driver", "org.mariadb.jdbc.Driver")
+props.put("driver", "com.mysql.cj.jdbc.Driver")
 
 // Read ref_commits table using JDBC instead of gitbase-spark-connector.
-val rcdf = spark.read.jdbc("jdbc:mariadb://localhost:3306/gitbase", "ref_commits", props)
+val rcdf = spark.read.jdbc("jdbc:mysql://localhost:3306/gitbase", "ref_commits", props)
     .drop("history_index")
 
 // Join both dataframes.

@@ -15,6 +15,7 @@ package object spark {
                               config: Map[String, String] = defaultConfig,
                               rules: Seq[Rule[LogicalPlan]] = rule.getAll
                              ): SparkSession.Builder = {
+      JdbcDialects.registerDialect(GitbaseDialect())
 
       val gsConfig = if (server.isEmpty) {
         config
@@ -30,7 +31,6 @@ package object spark {
       val ss = builder.getOrCreate()
       udf.registerUDFs(ss)
       createTempViews(ss)
-      JdbcDialects.registerDialect(GitbaseDialect())
 
       builder
     }

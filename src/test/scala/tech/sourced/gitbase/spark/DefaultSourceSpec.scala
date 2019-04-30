@@ -549,9 +549,9 @@ class DefaultSourceSpec extends BaseGitbaseSpec {
     val props = new Properties()
     props.put("user", "root")
     props.put("password", "")
-    props.put("driver", "org.mariadb.jdbc.Driver")
+    props.put("driver", "com.mysql.cj.jdbc.Driver")
 
-    val rcdf = spark.read.jdbc(s"jdbc:mariadb://$server/gitbase", "ref_commits", props)
+    val rcdf = spark.read.jdbc(s"jdbc:mysql://$server/gitbase", "ref_commits", props)
 
     val result = rcdf.collect()
     result.length should be(spark.table("ref_commits").count())

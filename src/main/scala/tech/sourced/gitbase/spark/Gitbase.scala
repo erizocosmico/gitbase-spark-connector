@@ -5,7 +5,7 @@ import java.sql._
 import org.apache.spark.sql.Row
 import org.apache.spark.sql.execution.datasources.jdbc.{JDBCOptions, JdbcUtils}
 import org.apache.spark.sql.jdbc.JdbcDialect
-import org.apache.spark.sql.types.StructType
+import org.apache.spark.sql.types.{BinaryType, DataType, MetadataBuilder, StructType}
 import org.apache.spark.unsafe.types.UTF8String
 
 case class GitbaseServer(host: String, user: String, password: String)
@@ -13,9 +13,9 @@ case class GitbaseServer(host: String, user: String, password: String)
 /**
   * Gitbase dialect is a JdbcDialect for Gitbase.
   *
-  * @param protocol protocol to use, "jdbc:mariadb" by default.
+  * @param protocol protocol to use, "jdbc:mysql" by default.
   */
-case class GitbaseDialect(protocol: String = "jdbc:mariadb") extends JdbcDialect {
+case class GitbaseDialect(protocol: String = "jdbc:mysql") extends JdbcDialect {
 
   override def canHandle(url: String): Boolean = url.startsWith(protocol)
 
@@ -30,6 +30,17 @@ case class GitbaseDialect(protocol: String = "jdbc:mariadb") extends JdbcDialect
     s"`$ident`"
   }
 
+  override def getCatalystType(sqlType: Int,
+                               typeName: String,
+                               size: Int,
+                               md: MetadataBuilder): Option[DataType] =  {
+    // JSON gets the String type if we don't special case it.
+    if (typeName.toLowerCase == "json") {
+      Some(BinaryType)
+    } else {
+      super.getCatalystType(sqlType, typeName, size, md)
+    }
+  }
 }
 
 /**
@@ -45,17 +56,17 @@ object Gitbase {
     * schema.
     *
     * @param server gitbase server details.
-    * @param table table name.
+    * @param table  table name.
     * @return A StructType giving the table's Catalyst schema.
     * @throws SQLException if the table specification is garbage.
     * @throws SQLException if the table contains an unsupported type.
     */
   def resolveTable(server: GitbaseServer, table: String): StructType = {
     val options = new JDBCOptions(
-      s"jdbc:mariadb://${server.host}",
+      s"jdbc:mysql://${server.host}",
       table,
       Map(
-        "driver" -> "org.mariadb.jdbc.Driver",
+        "driver" -> "com.mysql.cj.jdbc.Driver",
         "user" -> server.user,
         "password" -> server.password
       )
@@ -85,13 +96,13 @@ object Gitbase {
     * Connects using the given connection string and executes a query.
     *
     * @param server data to connect to the gitbase server
-    * @param query            query to execute
+    * @param query  query to execute
     * @return iterator of rows and a closure to close the connection after
     *         the iterator has been used.
     */
   def query(server: GitbaseServer, query: String): (Iterator[Row], () => Unit) = {
     val connection = DriverManager.getConnection(
-      s"jdbc:mariadb://${server.host}",
+      s"jdbc:mysql://${server.host}",
       server.user,
       server.password
     )

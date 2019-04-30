@@ -39,11 +39,13 @@ object QueryBuilder {
       str.stripPrefix("\"").stripSuffix("\"")
     }
 
+  private def quoteName(str: String): String = str.replace('`', '\'')
+
   // scalastyle:off cyclomatic.complexity
   def compileExpression(expr: Expression): Option[String] = {
     expr match {
       case Alias(child, name) => compileExpression(child)
-        .map(x => s"$x AS `$name`")
+        .map(x => s"$x AS `${quoteName(name)}`")
       case ScalaUDF(_, _, children, _, Some(name), _, _) =>
         val args = children.map(compileExpression)
         if (args.forall(_.isDefined) && udf.isSupported(name)) {
